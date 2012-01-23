@@ -47,7 +47,7 @@ use Pod::Usage;
 use POSIX;
 use Try::Tiny;
 
-use Util;
+use Util qw(clean_mac);
 use pf::util::dhcp;
 
 my %args;
