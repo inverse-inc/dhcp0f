@@ -1,0 +1,12 @@
+TODO
+====
+
+Win port
+--------
+
+* get rid of POSIX
+
+Low
+---
+
+* Compare with and w/o Readonly::XS for performance
