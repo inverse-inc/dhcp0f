@@ -23,7 +23,7 @@ Install
 Author
 ------
 
-Olivier Bilodeau <obilodeau@inverse.ca>
+Olivier Bilodeau, <obilodeau@inverse.ca>
 
 
 License
