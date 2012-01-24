@@ -15,11 +15,15 @@ Requirements
 Install
 -------
 
-**Instructions are incomplete**
+1. Install Net::Pcap
 
-1. `git clone ...`
-2. install Net::Pcap
-3. ./dhcspy.pl -i <interface>
+   On RHEL / CentOS / Fedora: `yum install perl-Net-Pcap`
+
+   On Debian / Ubuntu: `apt-get install libnet-pcap-perl`
+
+2. `git clone git://github.com/inverse-inc/dhcspy.git`
+
+3. `cd dhcspy/`
 
 
 Use
@@ -27,7 +31,7 @@ Use
 
 Note: You need root privileges because we need to bind to a service port.
 
-  sudo ./dhcspy.pl -i <interface>
+    sudo ./dhcspy.pl -i <interface>
 
 Run `./dhcspy.pl -h` to see all options described.
 
