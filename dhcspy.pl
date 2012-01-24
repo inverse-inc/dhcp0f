@@ -229,13 +229,14 @@ sub listen_dhcp {
             $logger->info( "$tmpkey: $output" );
         }
     }
+    $logger->info("TTL: $l3->{'ttl'}");
 
     my $fprint = $dhcp->{'options'}{'55'};
-    if (defined($fprint) && defined( $prints{$fprint}) ) {
-        $logger->info("OS/Device Ident: $prints{$fprint}");
-    }
+    $logger->info("DHCP fingerprint: " . ( defined($fprint) ? $fprint : 'None' ));
+    $logger->info("OS / Device Identification: "
+        . ( (defined($fprint) && defined( $prints{$fprint})) ? $prints{$fprint} : 'Unknown' )
+    );
 
-    $logger->info("TTL: $l3->{'ttl'}");
     $logger->info("=" x 80);
 }
 
