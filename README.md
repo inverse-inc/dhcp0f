@@ -22,6 +22,16 @@ Install
 3. ./dhcspy.pl -i <interface>
 
 
+Use
+---
+
+Note: You need root privileges because we need to bind to a service port.
+
+  sudo ./dhcspy.pl -i <interface>
+
+Run `./dhcspy.pl -h` to see all options described.
+
+
 Author
 ------
 

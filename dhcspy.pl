@@ -41,7 +41,7 @@ use Config::IniFiles;
 use Data::Dumper;
 use File::Basename qw(basename);
 use Getopt::Std;
-use Log::Log4perl qw(:easy);
+use Log::Log4perl qw(:easy :no_extra_logdie_message);
 use Net::Pcap 0.16;
 use Pod::Usage;
 use POSIX;
@@ -151,16 +151,16 @@ my $net;
 my $mask;
 my $opt = 1;
 my $err;
-# FIXME bad error handling here:
-# $ sudo ./dhcspy.pl -v
-# Use of uninitialized value in subroutine entry at ./dhcspy.pl line 156.
-# p is not of type pcap_tPtr at ./dhcspy.pl line 156.
-#
-my $pcap_t = Net::Pcap::pcap_open_live( $interface, 576, 1, 0, \$err );
+
+my $pcap_t = Net::Pcap::pcap_open_live($interface, 576, 1, 0, \$err)
+    or $logger->logdie("Unable to open network capture: $err");
+
 if ( ( Net::Pcap::compile( $pcap_t, \$filter_t, $filter, $opt, 0 ) ) == -1 ) {
     $logger->logdie("Unable to compile filter string '$filter'");
 }
+
 Net::Pcap::setfilter( $pcap_t, $filter_t );
+
 $logger->info("Starting to listen on $interface with filter: $filter");
 Net::Pcap::loop( $pcap_t, -1, \&process_pkt, $interface );
 
