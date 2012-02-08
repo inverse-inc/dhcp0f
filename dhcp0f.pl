@@ -4,6 +4,14 @@
 
 dhcp0f.pl - Passive DHCP analyzer with OS fingerprinting on the LAN through DHCP
 
+=head1 DESCRIPTION
+
+While it is running, it will decode and expose information held in DHCP 
+traffic including a guess of the Operating System of clients.
+
+When you Ctrl-C the application, it will output a summary table of the client 
+encountered, their IP and their guessed OS.
+
 =head1 SYNOPSIS
 
 dhcp0f.pl [options]
@@ -44,7 +52,7 @@ use Getopt::Std;
 use Log::Log4perl qw(:easy :no_extra_logdie_message);
 use Net::Pcap 0.16;
 use Pod::Usage;
-use POSIX;
+use POSIX qw(SIGINT);
 use Try::Tiny;
 
 use Util qw(clean_mac);
@@ -152,6 +160,8 @@ my $mask;
 my $opt = 1;
 my $err;
 
+my $summary_ref = [];
+
 my $pcap_t = Net::Pcap::pcap_open_live($interface, 576, 1, 0, \$err)
     or $logger->logdie("Unable to open network capture: $err");
 
@@ -160,6 +170,26 @@ if ( ( Net::Pcap::compile( $pcap_t, \$filter_t, $filter, $opt, 0 ) ) == -1 ) {
 }
 
 Net::Pcap::setfilter( $pcap_t, $filter_t );
+
+# Setting up signal handlers (SIGINT is Ctrl-C)
+# Note: usual signal handling technique was blocking until a packet arrived making it awkward
+POSIX::sigaction(SIGINT, POSIX::SigAction->new(sub {
+    # FIXME realized I can't print IP since it's not known yet 
+    # so some MAC to IP lookup table will have to be built updated by ACKs
+
+    # TODO extract into print_summary sub
+    # TODO format better
+    $logger->info(""); # hack to leave the ^C on it's own line
+    $logger->info("=" x 80);
+    $logger->info("|                       Summary of DHCP clients encountered                    |");
+    $logger->info("=" x 80);
+    foreach my $dhcp_client_ref (@$summary_ref) {
+        $logger->info("$dhcp_client_ref->{ip} $dhcp_client_ref->{guessed_os} $dhcp_client_ref->{fingerprint} $dhcp_client_ref->{vendor}");
+    }
+    $logger->info("=" x 80);
+    exit 0;
+})) or die "Error setting SIGINT handler: $!\n";
+
 
 $logger->info("Starting to listen on $interface with filter: $filter");
 Net::Pcap::loop( $pcap_t, -1, \&process_pkt, $interface );
@@ -232,12 +262,23 @@ sub listen_dhcp {
     $logger->info("TTL: $l3->{'ttl'}");
 
     my $fprint = $dhcp->{'options'}{'55'};
-    $logger->info("DHCP fingerprint: " . ( defined($fprint) ? $fprint : 'None' ));
-    $logger->info("OS / Device Identification: "
-        . ( (defined($fprint) && defined( $prints{$fprint})) ? $prints{$fprint} : 'Unknown' )
-    );
+    my $fprint_pretty = ( defined($fprint) ? $fprint : 'None' );
+    my $os_pretty = ( (defined($fprint) && defined( $prints{$fprint})) ? $prints{$fprint} : 'Unknown' );
+    $logger->info("DHCP fingerprint: $fprint_pretty");
+    $logger->info("OS / Device Identification: $os_pretty");
 
     $logger->info("=" x 80);
+
+    # Only add to summary if a client
+    # FIXME use constants instead of hardcoded numbers
+    if ( $dhcp->{'options'}{'53'} == 1 || $dhcp->{'options'}{'53'} == 3 ) {
+        push @$summary_ref, { 
+            'ip' => $l3->{'src_ip'}, 
+            'guessed_os' => $os_pretty, 
+            'fingerprint' => $fprint_pretty, 
+            'vendor' => $dhcp->{'options'}{'60'} || 'None',
+        };
+    }
 }
 
 =head1 AUTHOR
