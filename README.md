@@ -15,15 +15,15 @@ Requirements
 Install
 -------
 
-1. Install Net::Pcap
+1.  Install Net::Pcap
 
-   On RHEL / CentOS / Fedora: `yum install perl-Net-Pcap`
+    On RHEL / CentOS / Fedora: `yum install perl-Net-Pcap`
 
-   On Debian / Ubuntu: `apt-get install libnet-pcap-perl`
+    On Debian / Ubuntu: `apt-get install libnet-pcap-perl`
 
-2. `git clone git://github.com/inverse-inc/dhcp0f.git`
+2.  `git clone git://github.com/inverse-inc/dhcp0f.git`
 
-3. `cd dhcp0f/`
+3.  `cd dhcp0f/`
 
 
 Use
