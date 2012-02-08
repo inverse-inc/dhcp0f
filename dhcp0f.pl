@@ -2,11 +2,11 @@
 
 =head1 NAME
 
-dhcspy.pl - Passive DHCP analyzer with OS fingerprinting on the LAN through DHCP
+dhcp0f.pl - Passive DHCP analyzer with OS fingerprinting on the LAN through DHCP
 
 =head1 SYNOPSIS
 
-dhcspy.pl [options]
+dhcp0f.pl [options]
 
  Options:
    -i      Interface (default: "eth0")

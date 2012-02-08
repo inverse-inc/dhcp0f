@@ -1,4 +1,4 @@
-dhcspy
+dhcp0f
 ======
 
 Passive DHCP analyzer with OS fingerprinting on the LAN through DHCP
@@ -21,9 +21,9 @@ Install
 
    On Debian / Ubuntu: `apt-get install libnet-pcap-perl`
 
-2. `git clone git://github.com/inverse-inc/dhcspy.git`
+2. `git clone git://github.com/inverse-inc/dhcp0f.git`
 
-3. `cd dhcspy/`
+3. `cd dhcp0f/`
 
 
 Use
@@ -31,9 +31,9 @@ Use
 
 Note: You need root privileges because we need to bind to a service port.
 
-    sudo ./dhcspy.pl -i <interface>
+    sudo ./dhcp0f.pl -i <interface>
 
-Run `./dhcspy.pl -h` to see all options described.
+Run `./dhcp0f.pl -h` to see all options described.
 
 
 Author
@@ -56,6 +56,6 @@ Refer to the individual projects.
 Thanks
 ------
 
-* Francois Proulx for the tool's name
+* Julien Desfossez for the tool's name (with an honorable mention to Francois Proulx's idea dhcspy)
 * CISSP Groupies for the tool's name brainstorm
 
