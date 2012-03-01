@@ -161,6 +161,7 @@ my $opt = 1;
 my $err;
 
 my $summary_ref = [];
+my $acked_ips_by_mac_ref = {};
 
 my $pcap_t = Net::Pcap::pcap_open_live($interface, 576, 1, 0, \$err)
     or $logger->logdie("Unable to open network capture: $err");
@@ -172,10 +173,8 @@ if ( ( Net::Pcap::compile( $pcap_t, \$filter_t, $filter, $opt, 0 ) ) == -1 ) {
 Net::Pcap::setfilter( $pcap_t, $filter_t );
 
 # Setting up signal handlers (SIGINT is Ctrl-C)
-# Note: usual signal handling technique was blocking until a packet arrived making it awkward
+# Note: perl's simpler signal handling technique was blocking until a packet arrived making it awkward
 POSIX::sigaction(SIGINT, POSIX::SigAction->new(sub {
-    # FIXME realized I can't print IP since it's not known yet 
-    # so some MAC to IP lookup table will have to be built updated by ACKs
 
     # TODO extract into print_summary sub
     # TODO format better
@@ -183,8 +182,9 @@ POSIX::sigaction(SIGINT, POSIX::SigAction->new(sub {
     $logger->info("=" x 80);
     $logger->info("|                       Summary of DHCP clients encountered                    |");
     $logger->info("=" x 80);
+    # TODO defend against undef results in $acked_ips_by_mac_ref->{$mac}
     foreach my $dhcp_client_ref (@$summary_ref) {
-        $logger->info("$dhcp_client_ref->{ip} $dhcp_client_ref->{guessed_os} $dhcp_client_ref->{fingerprint} $dhcp_client_ref->{vendor}");
+        $logger->info("$dhcp_client_ref->{mac} $acked_ips_by_mac_ref->{$dhcp_client_ref->{mac}} $dhcp_client_ref->{guessed_os} $dhcp_client_ref->{fingerprint} $dhcp_client_ref->{vendor}");
     }
     $logger->info("=" x 80);
     exit 0;
@@ -270,14 +270,17 @@ sub listen_dhcp {
     $logger->info("=" x 80);
 
     # Only add to summary if a client
-    # FIXME use constants instead of hardcoded numbers
+    # TODO use constants instead of hardcoded numbers
     if ( $dhcp->{'options'}{'53'} == 1 || $dhcp->{'options'}{'53'} == 3 ) {
         push @$summary_ref, { 
-            'ip' => $l3->{'src_ip'}, 
+            'mac' => clean_mac($l2->{'src_mac'}),
             'guessed_os' => $os_pretty, 
             'fingerprint' => $fprint_pretty, 
             'vendor' => $dhcp->{'options'}{'60'} || 'None',
         };
+
+        # we cache the MAC -> requested IP association for later retrieval
+        $acked_ips_by_mac_ref->{$dhcp->{'chaddr'}} = $dhcp->{'options'}{'50'};
     }
 }
 
