@@ -9,6 +9,7 @@ dhcp0f.pl - Passive DHCP analyzer with OS fingerprinting on the LAN through DHCP
 dhcp0f.pl [options]
 
  Options:
+   -k      Fingerbank API key (mandatory)
    -i      Interface (default: "eth0")
    -f      Filter (eg. "host 128.103.1.1")
    -c      CHADDR (show requests from specific client)
@@ -51,7 +52,20 @@ use pf::util::dhcp;
 use fingerbank::api;
 
 my %args;
-getopts( 't:i:f:c:o:huv', \%args );
+getopts( 'k:t:i:f:c:o:huv', \%args );
+
+my $verbose = $INFO;
+if ( $args{v} ) {
+    $verbose = $DEBUG;
+}
+
+Log::Log4perl->easy_init({ level  => $verbose, layout => '%m%n' });
+my $logger = Log::Log4perl->get_logger('');                                                                             
+
+unless($args{'k'}){
+    $logger->fatal("No key specified");
+    pod2usage( -verbose => 1 );
+}
 
 my $interface = $args{i} || "eth0";
 
@@ -75,13 +89,6 @@ my $unknown;
 if ( $args{u} ) {
     $unknown = 1;
 }
-my $verbose = $INFO;
-if ( $args{v} ) {
-    $verbose = $DEBUG;
-}
-Log::Log4perl->easy_init({ level  => $verbose, layout => '%m%n' });
-my $logger = Log::Log4perl->get_logger('');                                                                             
-
 my %msg_types;
 $msg_types{'1'}   = "subnet mask";
 $msg_types{'3'}   = "router";
@@ -197,7 +204,7 @@ sub listen_dhcp {
     $logger->info("DHCP fingerprint: " . ( defined($dhcp_fingerprint) ? $dhcp_fingerprint : 'None' ));
     $logger->info("DHCP vendor: " . ( defined($dhcp_vendor) ? $dhcp_vendor : 'None' ));
 
-    my $fingerbank_result = fingerbank::api::query("6fc22e7c40c386fe2ca4fda7816081f6026d3d07", {dhcp_fingerprint => $dhcp_fingerprint, dhcp_vendor => $dhcp_vendor});
+    my $fingerbank_result = fingerbank::api::query($args{k}, {dhcp_fingerprint => $dhcp_fingerprint, dhcp_vendor => $dhcp_vendor});
 
     my ($fingerbank_device, $fingerbank_score);
     if(defined($fingerbank_result)) {
