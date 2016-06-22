@@ -287,11 +287,11 @@ sub _decode_dhcp_option82 {
 
 =head1 AUTHOR
 
-Olivier Bilodeau <obilodeau@inverse.ca>
+Inverse inc.
 
 =head1 COPYRIGHT
 
-Copyright (C) 2011 Inverse inc.
+Copyright (C) 2011-2016 Inverse inc.
 
 =head1 LICENSE
 

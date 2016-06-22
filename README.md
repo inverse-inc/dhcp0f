@@ -39,23 +39,14 @@ Run `./dhcp0f.pl -h` to see all options described.
 Author
 ------
 
-Olivier Bilodeau, <obilodeau@inverse.ca>
-
+Inverse inc.
 
 License
 -------
 
-Copyright (C) 2012 Inverse inc.
+Copyright (C) 2012-2016 Inverse inc.
 
 Licensed under the GPLv2 or later. See LICENSE for the full text.
 
 Other elements in extlib/ might carry another license. 
 Refer to the individual projects.
-
-
-Thanks
-------
-
-* Julien Desfossez for the tool's name (with an honorable mention to Francois Proulx's idea dhcspy)
-* CISSP Groupies for the tool's name brainstorm
-

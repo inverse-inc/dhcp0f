@@ -242,21 +242,11 @@ sub listen_dhcp {
 
 =head1 AUTHOR
 
-Olivier Bilodeau <obilodeau@inverse.ca>
-
-Dave Laporte <dave@laportestyle.org>
-
-Kevin Amorin <kev@amorin.org>
-
-Dominik Gehl <dgehl@inverse.ca>
+Inverse inc.
 
 =head1 COPYRIGHT
 
-Copyright (C) 2009-2012 Inverse inc.
-
-Copyright (C) 2005 Dave Laporte
-
-Copyright (C) 2005 Kevin Amorin
+Copyright (C) 2009-2016 Inverse inc.
 
 =head1 LICENSE
 

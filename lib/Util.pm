@@ -56,11 +56,11 @@ sub clean_mac {
  
 =head1 AUTHOR
 
-Olivier Bilodeau <obilodeau@inverse.ca>
+Inverse inc.
 
 =head1 COPYRIGHT
 
-Copyright (C) 2009-2011 Inverse inc.
+Copyright (C) 2009-2016 Inverse inc.
 
 =head1 LICENSE
 
