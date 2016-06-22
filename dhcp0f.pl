@@ -23,7 +23,6 @@ dhcp0f.pl [options]
                6     DHCPNAK
                7     DHCPRELEASE
                8     DHCPINFORM
-   -u      Only show packets with unknown DHCP prints
    -v      verbose 
    -h      Help
 
@@ -49,6 +48,7 @@ use Try::Tiny;
 
 use Util qw(clean_mac);
 use pf::util::dhcp;
+use fingerbank::api;
 
 my %args;
 getopts( 't:i:f:c:o:huv', \%args );
@@ -81,40 +81,6 @@ if ( $args{v} ) {
 }
 Log::Log4perl->easy_init({ level  => $verbose, layout => '%m%n' });
 my $logger = Log::Log4perl->get_logger('');                                                                             
-
-# TODO rename flag to -d (?) and document
-my $prints_file;
-my %prints;
-if ( $args{o} ) {
-    $prints_file = $args{o};
-} else {
-    $prints_file = $FindBin::Bin . '/db/dhcp_fingerprints.conf';
-}
-
-if ( -r $prints_file ) {
-    my %prints_ini;
-    tie %prints_ini, 'Config::IniFiles', ( -file => $prints_file );
-    my @errors = @Config::IniFiles::errors;
-    if ( scalar(@errors) ) {
-        die( "Error reading $prints_file: " 
-             . join( "\n", @errors ) . "\n" );
-    }
-
-    foreach my $os ( tied(%prints_ini)->GroupMembers("os") ) {
-        if ( exists( $prints_ini{$os}{'fingerprints'} ) ) {
-            if ( ref( $prints_ini{$os}{'fingerprints'} ) eq "ARRAY" ) {
-                foreach my $print ( @{ $prints_ini{$os}{'fingerprints'} } ) {
-                    $prints{$print} = $prints_ini{$os}{'description'};
-                }
-            } else {
-                foreach my $print (
-                    split( /\n/, $prints_ini{$os}{'fingerprints'} ) ) {
-                        $prints{$print} = $prints_ini{$os}{'description'};
-                }
-            }
-        }
-    }
-}
 
 my %msg_types;
 $msg_types{'1'}   = "subnet mask";
@@ -194,11 +160,6 @@ sub listen_dhcp {
     # DHCP Message Type filter
     return if ( $type && $type ne $dhcp->{'options'}{'53'} );
 
-    # skip known signature if we said so on the command line
-    if ( defined( $dhcp->{'options'}{'55'} ) ) {
-        return if ( $unknown && defined( $prints{$dhcp->{'options'}{'55'}} ) );
-    }
-
     $logger->info(POSIX::strftime( "%Y-%m-%d %H:%M:%S", localtime ));
     $logger->info("-" x 80);
     $logger->info(sprintf("Ethernet\tsrc:\t%s\tdst:\t%s", clean_mac($l2->{'src_mac'}), clean_mac($l2->{'dest_mac'})));
@@ -231,11 +192,24 @@ sub listen_dhcp {
     }
     $logger->info("TTL: $l3->{'ttl'}");
 
-    my $fprint = $dhcp->{'options'}{'55'};
-    $logger->info("DHCP fingerprint: " . ( defined($fprint) ? $fprint : 'None' ));
-    $logger->info("OS / Device Identification: "
-        . ( (defined($fprint) && defined( $prints{$fprint})) ? $prints{$fprint} : 'Unknown' )
-    );
+    my $dhcp_fingerprint = $dhcp->{'options'}{'55'};
+    my $dhcp_vendor = $dhcp->{'options'}{'60'};
+    $logger->info("DHCP fingerprint: " . ( defined($dhcp_fingerprint) ? $dhcp_fingerprint : 'None' ));
+    $logger->info("DHCP vendor: " . ( defined($dhcp_vendor) ? $dhcp_vendor : 'None' ));
+
+    my $fingerbank_result = fingerbank::api::query("6fc22e7c40c386fe2ca4fda7816081f6026d3d07", {dhcp_fingerprint => $dhcp_fingerprint, dhcp_vendor => $dhcp_vendor});
+
+    my ($fingerbank_device, $fingerbank_score);
+    if(defined($fingerbank_result)) {
+        $fingerbank_device = join('/', reverse(map {$_->{name}} @{$fingerbank_result->{device}->{parents}})) . '/' . $fingerbank_result->{device}->{name};
+        $fingerbank_score = $fingerbank_result->{score} 
+    }
+    else {
+        $fingerbank_device = "Unknown";
+        $fingerbank_score = "N/A";
+    }
+    $logger->info("Fingerbank device : $fingerbank_device");
+    $logger->info("Fingerbank score : $fingerbank_score");
 
     $logger->info("=" x 80);
 }
