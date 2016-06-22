@@ -29,9 +29,11 @@ Install
 Use
 ---
 
+First, get a Fingerbank API key by registering an account on https://fingerbank.inverse.ca/users/register
+
 Note: You need root privileges because we need to bind to a service port.
 
-    sudo ./dhcp0f.pl -i <interface>
+    sudo ./dhcp0f.pl -i <interface> -k FINGERBANK_API_KEY
 
 Run `./dhcp0f.pl -h` to see all options described.
 
