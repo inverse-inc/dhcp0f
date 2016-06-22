@@ -206,17 +206,16 @@ sub listen_dhcp {
 
     my $fingerbank_result = fingerbank::api::query($args{k}, {dhcp_fingerprint => $dhcp_fingerprint, dhcp_vendor => $dhcp_vendor});
 
-    my ($fingerbank_device, $fingerbank_score);
     if(defined($fingerbank_result)) {
-        $fingerbank_device = join('/', reverse(map {$_->{name}} @{$fingerbank_result->{device}->{parents}})) . '/' . $fingerbank_result->{device}->{name};
-        $fingerbank_score = $fingerbank_result->{score} 
+        my $fingerbank_device = join('/', reverse(map {$_->{name}} @{$fingerbank_result->{device}->{parents}})) . '/' . $fingerbank_result->{device}->{name};
+        $logger->info("Fingerbank device : $fingerbank_device (".$fingerbank_result->{device}->{id}.")");
+        my $fingerbank_version = $fingerbank_result->{version} // 'Unknown';
+        $logger->info("Fingerbank device version : ".$fingerbank_version);
+        $logger->info("Fingerbank device score : ".$fingerbank_result->{score});
     }
     else {
-        $fingerbank_device = "Unknown";
-        $fingerbank_score = "N/A";
+        $logger->info("Fingerbank device unknown");
     }
-    $logger->info("Fingerbank device : $fingerbank_device");
-    $logger->info("Fingerbank score : $fingerbank_score");
 
     $logger->info("=" x 80);
 }
