@@ -155,6 +155,14 @@ sub _new {
 }
 
 ##################################################
+sub category {
+##################################################
+   my ($self) = @_;
+
+   return $self->{ category };
+}
+
+##################################################
 sub reset_all_output_methods {
 ##################################################
     print "reset_all_output_methods: \n" if _INTERNAL_DEBUG;
@@ -169,7 +177,7 @@ sub reset_all_output_methods {
 sub set_output_methods {
 # Here's a big performance increase.  Instead of having the logger
 # calculate whether to log and whom to log to every time log() is called,
-# we calculcate it once when the logger is created, and recalculate
+# we calculate it once when the logger is created, and recalculate
 # it if the config information ever changes.
 #
 ##################################################
@@ -391,7 +399,7 @@ sub generate_watch_code {
                my $methodname = lc($level);
 
                # Bump up the caller level by three, since
-               # we've artifically introduced additional levels.
+               # we've artificially introduced additional levels.
                local $Log::Log4perl::caller_depth =
                      $Log::Log4perl::caller_depth + 3;
 
@@ -540,10 +548,14 @@ sub get_root_logger {
 ##################################################
 sub additivity {
 ##################################################
-    my($self, $onoff) = @_;
+    my($self, $onoff, $no_reinit) = @_;
 
     if(defined $onoff) {
         $self->{additivity} = $onoff;
+    }
+
+    if( ! $no_reinit ) {
+        $self->set_output_methods();
     }
 
     return $self->{additivity};
@@ -555,7 +567,7 @@ sub get_logger {
     my($class, $category) = @_;
 
     unless(defined $ROOT_LOGGER) {
-        die "Internal error: Root Logger not initialized.";
+        Carp::confess "Internal error: Root Logger not initialized.";
     }
 
     return $ROOT_LOGGER if $category eq "";
@@ -813,7 +825,11 @@ sub init_warn {
 sub callerline {
   my $message = join ('', @_);
 
-  my ($pack, $file, $line) = caller($Log::Log4perl::caller_depth + 1);
+  my $caller_offset = 
+    Log::Log4perl::caller_depth_offset( 
+        $Log::Log4perl::caller_depth + 1 );
+
+  my ($pack, $file, $line) = caller($caller_offset);
 
   if (not chomp $message) {     # no newline
     $message .= " at $file line $line";
@@ -839,13 +855,17 @@ sub and_warn {
 sub and_die {
 #######################################################
   my $self = shift;
+  my $arg  = $_[0];
 
   my($msg) = callerline($self->warning_render(@_));
 
   if($DIE_DEBUG) {
       $DIE_DEBUG_BUFFER = "DIE_DEBUG: $msg";
   } else {
-      die("$msg\n");
+      if( $Log::Log4perl::STRINGIFY_DIE_MESSAGE ) {
+          die("$msg\n");
+      }
+      die $arg;
   }
 }
 
@@ -862,8 +882,9 @@ sub logwarn {
     my @chomped = @_;
     chomp($chomped[-1]);
     $self->warn(@chomped);
-    $self->and_warn(@_);
   }
+
+  $self->and_warn(@_);
 }
 
 ##################################################
@@ -923,8 +944,9 @@ sub logcluck {
     foreach (split(/\n/, $message)) {
       $self->warn("$_\n");
     }
-    Carp::cluck($msg);
   }
+
+  Carp::cluck($msg);
 }
 
 ##################################################
@@ -944,8 +966,9 @@ sub logcarp {
     foreach (split(/\n/, $message)) {
       $self->warn("$_\n");
     }
-    Carp::carp($msg) if $Log::Log4perl::LOGDIE_MESSAGE_ON_STDERR;
   }
+
+  Carp::carp($msg);
 }
 
 ##################################################
@@ -954,6 +977,7 @@ sub logcarp {
 sub logcroak {
 ##################################################
   my $self = shift;
+  my $arg  = $_[0];
 
   my $msg = $self->warning_render(@_);
 
@@ -970,8 +994,14 @@ sub logcroak {
     }
   }
 
+  my $croak_msg = $arg;
+
+  if( $Log::Log4perl::STRINGIFY_DIE_MESSAGE ) {
+      $croak_msg = $msg;
+  }
+
   $Log::Log4perl::LOGDIE_MESSAGE_ON_STDERR ? 
-      Carp::croak($msg) : 
+      Carp::croak($croak_msg) : 
         exit($Log::Log4perl::LOGEXIT_CODE);
 }
 
@@ -979,6 +1009,7 @@ sub logcroak {
 sub logconfess {
 ##################################################
   my $self = shift;
+  my $arg  = $_[0];
 
   local $Carp::CarpLevel = 
         $Carp::CarpLevel + 1;
@@ -995,8 +1026,14 @@ sub logconfess {
     }
   }
 
+  my $confess_msg = $arg;
+
+  if( $Log::Log4perl::STRINGIFY_DIE_MESSAGE ) {
+      $confess_msg = $msg;
+  }
+
   $Log::Log4perl::LOGDIE_MESSAGE_ON_STDERR ? 
-      confess($msg) :
+      confess($confess_msg) :
         exit($Log::Log4perl::LOGEXIT_CODE);
 }
 
@@ -1012,8 +1049,9 @@ sub error_warn {
 
   if ($self->is_error()) {
     $self->error(@_);
-    $self->and_warn(@_);
   }
+
+  $self->and_warn(@_);
 }
 
 ##################################################
@@ -1078,6 +1116,8 @@ sub dec_level {
 
 __END__
 
+=encoding utf8
+
 =head1 NAME
 
 Log::Log4perl::Logger - Main Logger Class
@@ -1091,12 +1131,35 @@ Log::Log4perl::Logger - Main Logger Class
 While everything that makes Log4perl tick is implemented here,
 please refer to L<Log::Log4perl> for documentation.
 
-=head1 COPYRIGHT AND LICENSE
+=head1 LICENSE
 
-Copyright 2002-2009 by Mike Schilli E<lt>m@perlmeister.comE<gt> 
+Copyright 2002-2013 by Mike Schilli E<lt>m@perlmeister.comE<gt> 
 and Kevin Goess E<lt>cpan@goess.orgE<gt>.
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself. 
 
-=cut
+=head1 AUTHOR
+
+Please contribute patches to the project on Github:
+
+    http://github.com/mschilli/log4perl
+
+Send bug reports or requests for enhancements to the authors via our
+
+MAILING LIST (questions, bug reports, suggestions/patches): 
+log4perl-devel@lists.sourceforge.net
+
+Authors (please contact them via the list above, not directly):
+Mike Schilli <m@perlmeister.com>,
+Kevin Goess <cpan@goess.org>
+
+Contributors (in alphabetical order):
+Ateeq Altaf, Cory Bennett, Jens Berthold, Jeremy Bopp, Hutton
+Davidson, Chris R. Donnelly, Matisse Enzer, Hugh Esco, Anthony
+Foiani, James FitzGibbon, Carl Franks, Dennis Gregorovic, Andy
+Grundman, Paul Harrington, Alexander Hartmaier  David Hull, 
+Robert Jacobson, Jason Kohles, Jeff Macdonald, Markus Peter, 
+Brett Rann, Peter Rabbitson, Erik Selberg, Aaron Straup Cope, 
+Lars Thegler, David Viner, Mac Yang.
+

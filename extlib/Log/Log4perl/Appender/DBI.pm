@@ -33,8 +33,10 @@ sub new {
     #log4j.appender.DBAppndr.params.2 = %5.5m
     foreach my $pnum (keys %{$p{params}}){
         $self->{bind_value_layouts}{$pnum} = 
-                Log::Log4perl::Layout::PatternLayout->new(
-                    {ConversionPattern => {value  => $p{params}->{$pnum}}});
+                Log::Log4perl::Layout::PatternLayout->new({
+                   ConversionPattern  => {value  => $p{params}->{$pnum}},
+                   undef_column_value => undef,
+                });
     }
     #'bind_value_layouts' now contains a PatternLayout
     #for each parameter heading for the Sql engine
@@ -49,8 +51,10 @@ sub new {
         $self->{sth} = $self->create_statement($p{sql});
         $self->{usePreparedStmt} = 1;
     }else{
-        $self->{layout} = Log::Log4perl::Layout::PatternLayout->new(
-                    {ConversionPattern => {value  => $p{sql}}});
+        $self->{layout} = Log::Log4perl::Layout::PatternLayout->new({
+            ConversionPattern  => {value  => $p{sql}},
+            undef_column_value => undef,
+        });
     }
 
     if ($self->{usePreparedStmt} &&  $self->{bufferSize}){
@@ -72,7 +76,7 @@ sub _init {
     } else {
         $self->{connect} = sub {
             DBI->connect(@params{qw(datasource username password)},
-                         {PrintError => 0})
+                         {PrintError => 0, $params{attrs} ? %{$params{attrs}} : ()})
                             or croak "Log4perl: $DBI::errstr";
         };
         $self->{dbh} = $self->{connect}->();
@@ -314,6 +318,8 @@ sub DESTROY {
 
 __END__
 
+=encoding utf8
+
 =head1 NAME
 
 Log::Log4perl::Appender::DBI - implements appending to a DB
@@ -335,17 +341,19 @@ Log::Log4perl::Appender::DBI - implements appending to a DB
      log4j.appender.DBAppndr.params.3 = %c
                                    #4 is the message from log()
                                    #5 is ipaddr from log()
-         
-     
+
      log4j.appender.DBAppndr.usePreparedStmt = 1
       #--or--
      log4j.appender.DBAppndr.bufferSize = 2
-     
-     #just pass through the array of message items in the log statement 
+
+     #just pass through the array of message items in the log statement
      log4j.appender.DBAppndr.layout    = Log::Log4perl::Layout::NoopLayout
      log4j.appender.DBAppndr.warp_message = 0
+
+     #driver attributes support
+     log4j.appender.DBAppndr.attrs.f_encoding = utf8
     };
-     
+
     $logger->warn( $custid, 'big problem!!', $ip_addr );
 
 =head1 CAVEAT
@@ -375,7 +383,7 @@ The simplest usage is this:
        INSERT INTO logtbl                \
           (loglevel, message)            \
           VALUES ('%c','%m')
-    
+
     log4j.appender.DBAppndr.layout    = Log::Log4perl::Layout::PatternLayout
 
 
@@ -395,7 +403,7 @@ But the downsides to that usage are:
 =item * 
 
 You'd better be darn sure there are not quotes in your log message, or your
-insert could have unforseen consequences!  This is a very insecure way to
+insert could have unforeseen consequences!  This is a very insecure way to
 handle database inserts, using place holders and bind values is much better, 
 keep reading. (Note that the log4j docs warn "Be careful of quotes in your 
 messages!") B<*>.
@@ -476,7 +484,7 @@ your message, it will use undef for the rest.  For instance,
 
 	$logger->info('arrest him!', $subpoena_id);
 
-results in the first '?' placholder being bound to %p, the second to
+results in the first '?' placeholder being bound to %p, the second to
 "arrest him!", the third to the date from "%d", and the fourth to your
 $subpoenaid.  If you forget the $subpoena_id and just log
 
@@ -546,7 +554,7 @@ see Log::Log4perl::Appender
 =item max_col_size
 
 If you're used to just throwing debugging messages like huge stacktraces
-into your logger, some databases (Sybase's DBD!!) may suprise you 
+into your logger, some databases (Sybase's DBD!!) may surprise you 
 by choking on data size limitations.  Normally, the data would
 just be truncated to fit in the column, but Sybases's DBD it turns out
 maxes out at 255 characters.  Use this parameter in such a situation
@@ -601,12 +609,35 @@ L<Log::Dispatch::DBI>
 
 L<Log::Log4perl::JavaMap::JDBCAppender>
 
-=head1 COPYRIGHT AND LICENSE
+=head1 LICENSE
 
-Copyright 2002-2009 by Mike Schilli E<lt>m@perlmeister.comE<gt> 
+Copyright 2002-2013 by Mike Schilli E<lt>m@perlmeister.comE<gt> 
 and Kevin Goess E<lt>cpan@goess.orgE<gt>.
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself. 
 
-=cut
+=head1 AUTHOR
+
+Please contribute patches to the project on Github:
+
+    http://github.com/mschilli/log4perl
+
+Send bug reports or requests for enhancements to the authors via our
+
+MAILING LIST (questions, bug reports, suggestions/patches): 
+log4perl-devel@lists.sourceforge.net
+
+Authors (please contact them via the list above, not directly):
+Mike Schilli <m@perlmeister.com>,
+Kevin Goess <cpan@goess.org>
+
+Contributors (in alphabetical order):
+Ateeq Altaf, Cory Bennett, Jens Berthold, Jeremy Bopp, Hutton
+Davidson, Chris R. Donnelly, Matisse Enzer, Hugh Esco, Anthony
+Foiani, James FitzGibbon, Carl Franks, Dennis Gregorovic, Andy
+Grundman, Paul Harrington, Alexander Hartmaier  David Hull, 
+Robert Jacobson, Jason Kohles, Jeff Macdonald, Markus Peter, 
+Brett Rann, Peter Rabbitson, Erik Selberg, Aaron Straup Cope, 
+Lars Thegler, David Viner, Mac Yang.
+

@@ -14,13 +14,16 @@ sub new {
     my($class, %options) = @_;
 
     my $self = { 
+        utf8 => 0,
         %options,
-               };
+    };
+
+    bless $self, $class;
 
     $self->file($self->{file}) if exists $self->{file};
     $self->text($self->{text}) if exists $self->{text};
 
-    bless $self, $class;
+    return $self;
 }
 
 ################################################
@@ -45,9 +48,26 @@ sub file {
 ################################################
     my($self, $filename) = @_;
 
-    open FILE, "<$filename" or die "Cannot open $filename ($!)";
-    $self->{text} = [<FILE>];
-    close FILE;
+    open my $fh, "$filename" or die "Cannot open $filename ($!)";
+
+    if( $self->{ utf8 } ) {
+        binmode $fh, ":utf8";
+    }
+
+    $self->file_h_read( $fh );
+    close $fh;
+}
+
+################################################
+sub file_h_read {
+################################################
+    my($self, $fh) = @_;
+
+        # Dennis Gregorovic <dgregor@redhat.com> added this
+        # to protect apps which are tinkering with $/ globally.
+    local $/ = "\n";
+
+    $self->{text} = [<$fh>];
 }
 
 ################################################
@@ -155,6 +175,8 @@ sub parse_post_process {
 1;
 
 __END__
+
+=encoding utf8
 
 =head1 NAME
 
@@ -289,12 +311,35 @@ Log::Log4perl::Config::DOMConfigurator
 
 Log::Log4perl::Config::LDAPConfigurator (tbd!)
 
-=head1 COPYRIGHT AND LICENSE
+=head1 LICENSE
 
-Copyright 2002-2009 by Mike Schilli E<lt>m@perlmeister.comE<gt> 
+Copyright 2002-2013 by Mike Schilli E<lt>m@perlmeister.comE<gt> 
 and Kevin Goess E<lt>cpan@goess.orgE<gt>.
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself. 
 
-=cut
+=head1 AUTHOR
+
+Please contribute patches to the project on Github:
+
+    http://github.com/mschilli/log4perl
+
+Send bug reports or requests for enhancements to the authors via our
+
+MAILING LIST (questions, bug reports, suggestions/patches): 
+log4perl-devel@lists.sourceforge.net
+
+Authors (please contact them via the list above, not directly):
+Mike Schilli <m@perlmeister.com>,
+Kevin Goess <cpan@goess.org>
+
+Contributors (in alphabetical order):
+Ateeq Altaf, Cory Bennett, Jens Berthold, Jeremy Bopp, Hutton
+Davidson, Chris R. Donnelly, Matisse Enzer, Hugh Esco, Anthony
+Foiani, James FitzGibbon, Carl Franks, Dennis Gregorovic, Andy
+Grundman, Paul Harrington, Alexander Hartmaier  David Hull, 
+Robert Jacobson, Jason Kohles, Jeff Macdonald, Markus Peter, 
+Brett Rann, Peter Rabbitson, Erik Selberg, Aaron Straup Cope, 
+Lars Thegler, David Viner, Mac Yang.
+

@@ -56,7 +56,7 @@ sub prepare {
     #
     # my strategy here is to split the format into active and literal
     # "chunks"; active chunks are prepared using $self->rep() as
-    # before, while literal chunks get transformed to accomodate
+    # before, while literal chunks get transformed to accommodate
     # single quotes and to protect percent signs.
     #
     # motivation: the "recommended" ISO-8601 date spec for a time in
@@ -121,9 +121,9 @@ sub rep {
     
     # So, the array to compute the time format at logtime contains
     # as many elements as the original SimpleDateFormat contained. Each
-    # entry is a arrary ref, holding an array with 2 elements: The index
+    # entry is a array ref, holding an array with 2 elements: The index
     # into the localtime to obtain the value and a reference to a subroutine
-    # to do computations eventually. The subroutine expects the orginal
+    # to do computations eventually. The subroutine expects the original
     # localtime() time component (like year since the epoch) and returns
     # the desired value for sprintf (like y+1900).
 
@@ -309,6 +309,8 @@ sub format {
 
 __END__
 
+=encoding utf8
+
 =head1 NAME
 
 Log::Log4perl::DateFormat - Log4perl advanced date formatter helper class
@@ -425,12 +427,35 @@ someone (and that could be you :) implements them:
 Also, C<Log::Log4perl::DateFormat> just knows about English week and
 month names, internationalization support has to be added.
 
-=head1 COPYRIGHT AND LICENSE
+=head1 LICENSE
 
-Copyright 2002-2009 by Mike Schilli E<lt>m@perlmeister.comE<gt> 
+Copyright 2002-2013 by Mike Schilli E<lt>m@perlmeister.comE<gt> 
 and Kevin Goess E<lt>cpan@goess.orgE<gt>.
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself. 
 
-=cut
+=head1 AUTHOR
+
+Please contribute patches to the project on Github:
+
+    http://github.com/mschilli/log4perl
+
+Send bug reports or requests for enhancements to the authors via our
+
+MAILING LIST (questions, bug reports, suggestions/patches): 
+log4perl-devel@lists.sourceforge.net
+
+Authors (please contact them via the list above, not directly):
+Mike Schilli <m@perlmeister.com>,
+Kevin Goess <cpan@goess.org>
+
+Contributors (in alphabetical order):
+Ateeq Altaf, Cory Bennett, Jens Berthold, Jeremy Bopp, Hutton
+Davidson, Chris R. Donnelly, Matisse Enzer, Hugh Esco, Anthony
+Foiani, James FitzGibbon, Carl Franks, Dennis Gregorovic, Andy
+Grundman, Paul Harrington, Alexander Hartmaier  David Hull, 
+Robert Jacobson, Jason Kohles, Jeff Macdonald, Markus Peter, 
+Brett Rann, Peter Rabbitson, Erik Selberg, Aaron Straup Cope, 
+Lars Thegler, David Viner, Mac Yang.
+

@@ -21,7 +21,6 @@ use File::Basename;
 
 our $TIME_HIRES_AVAILABLE_WARNED = 0;
 our $HOSTNAME;
-
 our %GLOBAL_USER_DEFINED_CSPECS = ();
 
 our $CSPECS = 'cCdFHIlLmMnpPrRtTxX%';
@@ -55,6 +54,10 @@ sub new {
         CSPECS                => $CSPECS,
         dontCollapseArrayRefs => $options->{dontCollapseArrayRefs}{value},
         last_time             => undef,
+        undef_column_value    => 
+            (exists $options->{ undef_column_value } 
+                ? $options->{ undef_column_value } 
+                : "[undef]"),
     };
 
     $self->{timer} = Log::Log4perl::Util::TimeTracker->new(
@@ -161,6 +164,8 @@ sub render {
 
     my @results = ();
 
+    my $caller_offset = Log::Log4perl::caller_depth_offset( $caller_level );
+
     if($self->{info_needed}->{L} or
        $self->{info_needed}->{F} or
        $self->{info_needed}->{C} or
@@ -169,32 +174,11 @@ sub render {
        $self->{info_needed}->{T} or
        0
       ) {
+
         my ($package, $filename, $line, 
             $subroutine, $hasargs,
             $wantarray, $evaltext, $is_require, 
-            $hints, $bitmask);
-
-        { 
-            ($package, $filename, $line,  
-             $subroutine, $hasargs,
-             $wantarray, $evaltext, $is_require, 
-             $hints, $bitmask) = my @callinfo =
-               caller($caller_level);
-
-            if(_INTERNAL_DEBUG) {
-                callinfo_dump( $caller_level, \@callinfo );
-            }
-
-            if(exists $Log::Log4perl::WRAPPERS_REGISTERED{$package}) {
-                  # We hit a predefined wrapper, step up to the next frame.
-                if(_INTERNAL_DEBUG) {
-                    print "[$package] recognized as a wrapper, increasing ",
-                          "caller level (currently $caller_level)\n";
-                }
-                $caller_level++;
-                redo;
-            }
-        }
+            $hints, $bitmask) = caller($caller_offset);
 
         # If caller() choked because of a whacko caller level,
         # correct undefined values to '[undef]' in order to prevent 
@@ -220,10 +204,10 @@ sub render {
             # logger, we need to go one additional level up.
             my $levels_up = 1; 
             {
-                my @callinfo = caller($caller_level+$levels_up);
+                my @callinfo = caller($caller_offset+$levels_up);
 
                 if(_INTERNAL_DEBUG) {
-                    callinfo_dump( $caller_level, \@callinfo );
+                    callinfo_dump( $caller_offset, \@callinfo );
                 }
 
                 $subroutine = $callinfo[3];
@@ -271,7 +255,7 @@ sub render {
         # Stack trace wanted?
     if($self->{info_needed}->{T}) {
         local $Carp::CarpLevel =
-              $Carp::CarpLevel + $caller_level;
+              $Carp::CarpLevel + $caller_offset;
         my $mess = Carp::longmess(); 
         chomp($mess);
         # $mess =~ s/(?:\A\s*at.*\n|^\s*Log::Log4perl.*\n|^\s*)//mg;
@@ -294,11 +278,12 @@ sub render {
             $self->{curlies} = $curlies;
             $result = $self->{USER_DEFINED_CSPECS}->{$op}->($self, 
                               $message, $category, $priority, 
-                              $caller_level+1);
+                              $caller_offset+1);
         } elsif(exists $info{$op}) {
             $result = $info{$op};
             if($curlies) {
-                $result = $self->curly_action($op, $curlies, $info{$op});
+                $result = $self->curly_action($op, $curlies, $info{$op},
+                                              $self->{printformat}, \@results);
             } else {
                 # just for %d
                 if($op eq 'd') {
@@ -310,8 +295,14 @@ sub render {
             $result = "FORMAT-ERROR";
         }
 
-        $result = "[undef]" unless defined $result;
+        $result = $self->{undef_column_value} unless defined $result;
         push @results, $result;
+    }
+
+      # dbi appender needs that
+    if( scalar @results == 1 and
+        !defined $results[0] ) {
+        return undef;
     }
 
     return (sprintf $self->{printformat}, @results);
@@ -320,7 +311,7 @@ sub render {
 ##################################################
 sub curly_action {
 ##################################################
-    my($self, $ops, $curlies, $data) = @_;
+    my($self, $ops, $curlies, $data, $printformat, $results) = @_;
 
     if($ops eq "c") {
         $data = shrink_category($data, $curlies);
@@ -335,6 +326,10 @@ sub curly_action {
     } elsif($ops eq "m") {
         if($curlies eq "chomp") {
             chomp $data;
+        } elsif( $curlies eq "indent" ) {
+            no warnings; # trailing array elements are undefined
+            my $indent = length sprintf $printformat, @$results;
+            $data =~ s/\n/ "\n" . (" " x $indent)/ge;
         }
     } elsif($ops eq "F") {
         my @parts = File::Spec->splitdir($data);
@@ -507,6 +502,8 @@ sub callinfo_dump {
 
 __END__
 
+=encoding utf8
+
 =head1 NAME
 
 Log::Log4perl::Layout::PatternLayout - Pattern Layout
@@ -542,6 +539,7 @@ replaced by the logging engine when it's time to log the message:
     %L Line number within the file where the log statement was issued
     %m The message to be logged
     %m{chomp} The message to be logged, stripped off a trailing newline
+    %m{indent} Log message, indented if mult-line
     %M Method or function where the logging request was issued
     %n Newline (OS-independent)
     %p Priority of the logging event (%p{1} shows the first letter)
@@ -795,12 +793,35 @@ This will add a single newline to every message, regardless if it
 complies with the Log4perl newline guidelines or not (thanks to 
 Tim Bunce for this idea).
 
-=head1 COPYRIGHT AND LICENSE
+=head1 LICENSE
 
-Copyright 2002-2009 by Mike Schilli E<lt>m@perlmeister.comE<gt> 
+Copyright 2002-2013 by Mike Schilli E<lt>m@perlmeister.comE<gt> 
 and Kevin Goess E<lt>cpan@goess.orgE<gt>.
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself. 
 
-=cut
+=head1 AUTHOR
+
+Please contribute patches to the project on Github:
+
+    http://github.com/mschilli/log4perl
+
+Send bug reports or requests for enhancements to the authors via our
+
+MAILING LIST (questions, bug reports, suggestions/patches): 
+log4perl-devel@lists.sourceforge.net
+
+Authors (please contact them via the list above, not directly):
+Mike Schilli <m@perlmeister.com>,
+Kevin Goess <cpan@goess.org>
+
+Contributors (in alphabetical order):
+Ateeq Altaf, Cory Bennett, Jens Berthold, Jeremy Bopp, Hutton
+Davidson, Chris R. Donnelly, Matisse Enzer, Hugh Esco, Anthony
+Foiani, James FitzGibbon, Carl Franks, Dennis Gregorovic, Andy
+Grundman, Paul Harrington, Alexander Hartmaier  David Hull, 
+Robert Jacobson, Jason Kohles, Jeff Macdonald, Markus Peter, 
+Brett Rann, Peter Rabbitson, Erik Selberg, Aaron Straup Cope, 
+Lars Thegler, David Viner, Mac Yang.
+

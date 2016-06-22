@@ -8,6 +8,8 @@ use warnings;
 use strict;
 use Log::Log4perl::Config::Watch;
 use Fcntl;
+use File::Path;
+use File::Spec::Functions qw(splitpath);
 use constant _INTERNAL_DEBUG => 0;
 
 ##################################################
@@ -31,16 +33,19 @@ sub new {
         recreate_pid_write      => undef,
         create_at_logtime       => 0,
         header_text             => undef,
+        mkpath                  => 0,
+        mkpath_umask            => 0,
         @options,
     };
 
     if($self->{create_at_logtime}) {
         $self->{recreate}  = 1;
     }
-
-    if(defined $self->{umask} and $self->{umask} =~ /^0/) {
-            # umask value is a string, meant to be an oct value
-        $self->{umask} = oct($self->{umask});
+    for my $param ('umask', 'mkpath_umask') {
+        if(defined $self->{$param} and $self->{$param} =~ /^0/) {
+                # umask value is a string, meant to be an oct value
+            $self->{$param} = oct($self->{$param});
+        }
     }
 
     die "Mandatory parameter 'filename' missing" unless
@@ -51,7 +56,7 @@ sub new {
     if($self->{recreate_pid_write}) {
         print "Creating pid file",
               " $self->{recreate_pid_write}\n" if _INTERNAL_DEBUG;
-        open FILE, ">$self->{recreate_pid_write}" or 
+        open FILE, ">$self->{recreate_pid_write}" or
             die "Cannot open $self->{recreate_pid_write}";
         print FILE "$$\n";
         close FILE;
@@ -79,7 +84,6 @@ sub file_open {
     my $arrows  = ">";
     my $sysmode = (O_CREAT|O_WRONLY);
 
-    my $old_umask = umask();
 
     if($self->{mode} eq "append") {
         $arrows   = ">>";
@@ -92,19 +96,39 @@ sub file_open {
 
     my $fh = do { local *FH; *FH; };
 
-    umask($self->{umask}) if defined $self->{umask};
 
-    my $didnt_exist = ! -f $self->{filename};
-
-    if($self->{syswrite}) {
-        sysopen $fh, "$self->{filename}", $sysmode or
-            die "Can't sysopen $self->{filename} ($!)";
-    } else {
-        open $fh, "$arrows$self->{filename}" or
-            die "Can't open $self->{filename} ($!)";
+    my $didnt_exist = ! -e $self->{filename};
+    if($didnt_exist && $self->{mkpath}) {
+        my ($volume, $path, $file) = splitpath($self->{filename});
+        if($path ne '' && !-e $path) {
+            my $old_umask = umask($self->{mkpath_umask}) if defined $self->{mkpath_umask};
+            my $options = {};
+            foreach my $param (qw(owner group) ) {
+                $options->{$param} = $self->{$param} if defined $self->{$param};
+            }
+            eval {
+                mkpath($path,$options);
+            };
+            umask($old_umask) if defined $old_umask;
+            die "Can't create path ${path} ($!)" if $@;
+        }
     }
 
-    if($didnt_exist and 
+    my $old_umask = umask($self->{umask}) if defined $self->{umask};
+
+    eval {
+        if($self->{syswrite}) {
+            sysopen $fh, "$self->{filename}", $sysmode or
+                die "Can't sysopen $self->{filename} ($!)";
+        } else {
+            open $fh, "$arrows$self->{filename}" or
+                die "Can't open $self->{filename} ($!)";
+        }
+    };
+    umask($old_umask) if defined $old_umask;
+    die $@ if $@;
+
+    if($didnt_exist and
          ( defined $self->{owner} or defined $self->{group} )
       ) {
 
@@ -127,13 +151,11 @@ sub file_open {
         );
     }
 
-    umask($old_umask) if defined $self->{umask};
-
     $self->{fh} = $fh;
 
     if ($self->{autoflush} and ! $self->{syswrite}) {
-        my $oldfh = select $self->{fh}; 
-        $| = 1; 
+        my $oldfh = select $self->{fh};
+        $| = 1;
         select $oldfh;
     }
 
@@ -160,8 +182,7 @@ sub file_close {
     my($self) = @_;
 
     if(defined $self->{fh}) {
-        close $self->{fh} or
-            die "Can't close $self->{filename} ($!)";
+        $self->close_with_care( $self->{ fh } );
     }
 
     undef $self->{fh};
@@ -199,7 +220,7 @@ sub perms_fix {
         }
     }
     if($uid != $uid_org or $gid != $gid_org) {
-        chown($uid, $gid, $self->{filename}) or 
+        chown($uid, $gid, $self->{filename}) or
             die "chown('$uid', '$gid') on '$self->{filename}' failed: $!";
     }
 }
@@ -224,9 +245,10 @@ sub log {
 
     if($self->{recreate}) {
         if($self->{recreate_check_signal}) {
-            if($self->{watcher}->{signal_caught}) {
-                $self->{watcher}->{signal_caught} = 0;
+            if(!$self->{watcher} or
+               $self->{watcher}->{signal_caught}) {
                 $self->file_switch($self->{filename});
+                $self->{watcher}->{signal_caught} = 0;
             }
         } else {
             if(!$self->{watcher} or
@@ -254,13 +276,43 @@ sub DESTROY {
 
     if ($self->{fh}) {
         my $fh = $self->{fh};
-        close $fh;
+        $self->close_with_care( $fh );
     }
+}
+
+###########################################
+sub close_with_care {
+###########################################
+    my( $self, $fh ) = @_;
+
+    my $prev_rc = $?;
+
+    my $rc = close $fh;
+
+      # [rt #84723] If a sig handler is reaping the child generated
+      # by close() internally before close() gets to it, it'll
+      # result in a weird (but benign) error that we don't want to
+      # expose to the user.
+    if( !$rc ) {
+        if( $self->{ mode } eq "pipe" and
+            $!{ ECHILD } ) {
+            if( $Log::Log4perl::CHATTY_DESTROY_METHODS ) {
+                warn "$$: pipe closed with ECHILD error -- guess that's ok";
+            }
+            $? = $prev_rc;
+        } else {
+            warn "Can't close $self->{filename} ($!)";
+        }
+    }
+
+    return $rc;
 }
 
 1;
 
 __END__
+
+=encoding utf8
 
 =head1 NAME
 
@@ -284,7 +336,7 @@ Log::Log4perl::Appender::File - Log to file
 This is a simple appender for writing to a file.
 
 The C<log()> method takes a single scalar. If a newline character
-should terminate the message, it has to be added explicitely.
+should terminate the message, it has to be added explicitly.
 
 Upon destruction of the object, the filehandle to access the
 file is flushed and closed.
@@ -305,7 +357,7 @@ Name of the log file.
 
 Messages will be append to the file if C<$mode> is set to the
 string C<"append">. Will clobber the file
-if set to C<"clobber">. If it is C<"pipe">, the file will be understood 
+if set to C<"clobber">. If it is C<"pipe">, the file will be understood
 as executable to pipe output to. Default mode is C<"append">.
 
 =item autoflush
@@ -319,14 +371,14 @@ C<syswrite>, if set to a true value, makes sure that the appender uses
 syswrite() instead of print() to log the message. C<syswrite()> usually
 maps to the operating system's C<write()> function and makes sure that
 no other process writes to the same log file while C<write()> is busy.
-Might safe you from having to use other syncronisation measures like
+Might safe you from having to use other synchronisation measures like
 semaphores (see: Synchronized appender).
 
 =item umask
 
 Specifies the C<umask> to use when creating the file, determining
-the file's permission settings. 
-If set to C<0222> (default), new
+the file's permission settings.
+If set to C<0022> (default), new
 files will be created with C<rw-r--r--> permissions.
 If set to C<0000>, new files will be created with C<rw-rw-rw-> permissions.
 
@@ -334,8 +386,9 @@ If set to C<0000>, new files will be created with C<rw-rw-rw-> permissions.
 
 If set, specifies that the owner of the newly created log file should
 be different from the effective user id of the running process.
-Only makes sense if the process is running as root. 
+Only makes sense if the process is running as root.
 Both numerical user ids and user names are acceptable.
+Log4perl does not attempt to change the ownership of I<existing> files.
 
 =item group
 
@@ -343,6 +396,7 @@ If set, specifies that the group of the newly created log file should
 be different from the effective group id of the running process.
 Only makes sense if the process is running as root.
 Both numerical group ids and group names are acceptable.
+Log4perl does not attempt to change the group membership of I<existing> files.
 
 =item utf8
 
@@ -375,11 +429,11 @@ Normally, if a file appender logs to a file and the file gets moved to
 a different location (e.g. via C<mv>), the appender's open file handle
 will automatically follow the file to the new location.
 
-This may be undesirable. When using an external logfile rotator, 
+This may be undesirable. When using an external logfile rotator,
 for example, the appender should create a new file under the old name
-and start logging into it. If the C<recreate> option is set to a true value, 
-C<Log::Log4perl::Appender::File> will do exactly that. It defaults to 
-false. Check the C<recreate_check_interval> option for performance 
+and start logging into it. If the C<recreate> option is set to a true value,
+C<Log::Log4perl::Appender::File> will do exactly that. It defaults to
+false. Check the C<recreate_check_interval> option for performance
 optimizations with this feature.
 
 =item recreate_check_interval
@@ -391,7 +445,7 @@ figure out if its inode has changed. Doing this with every call
 to C<log> can be prohibitively expensive. Setting it to a positive
 integer value N will only check the file every N seconds. It defaults to 30.
 
-This obviously means that the appender will continue writing to 
+This obviously means that the appender will continue writing to
 a moved file until the next check occurs, in the worst case
 this will happen C<recreate_check_interval> seconds after the file
 has been moved or deleted. If this is undesirable,
@@ -404,7 +458,7 @@ In C<recreate> mode, if this option is set to a signal name
 (e.g. "USR1"), the appender will recreate a missing logfile
 when it receives the signal. It uses less resources than constant
 polling. The usual limitation with perl's signal handling apply.
-Check the FAQ for using this option with the log rotating 
+Check the FAQ for using this option with the log rotating
 utility C<newsyslog>.
 
 =item recreate_pid_write
@@ -413,14 +467,14 @@ The popular log rotating utility C<newsyslog> expects a pid file
 in order to send the application a signal when its logs have
 been rotated. This option expects a path to a file where the pid
 of the currently running application gets written to.
-Check the FAQ for using this option with the log rotating 
+Check the FAQ for using this option with the log rotating
 utility C<newsyslog>.
 
 =item create_at_logtime
 
-The file appender typically creates its logfile in its constructor, i.e. 
+The file appender typically creates its logfile in its constructor, i.e.
 at Log4perl C<init()> time. This is desirable for most use cases, because
-it makes sure that file permission problems get detected right away, and 
+it makes sure that file permission problems get detected right away, and
 not after days/weeks/months of operation when the appender suddenly needs
 to log something and fails because of a problem that was obvious at
 startup.
@@ -439,17 +493,53 @@ If you want Log4perl to print a header into every newly opened
 or a subroutine returning a string. If the message doesn't have a newline,
 a newline at the end of the header will be provided.
 
+=item mkpath
+
+If this this option is set to true,
+the directory path will be created if it does not exist yet.
+
+=item mkpath_umask
+
+Specifies the C<umask> to use when creating the directory, determining
+the directory's permission settings.
+If set to C<0022> (default), new
+directory will be created with C<rwxr-xr-x> permissions.
+If set to C<0000>, new directory will be created with C<rwxrwxrwx> permissions.
+
 =back
 
 Design and implementation of this module has been greatly inspired by
 Dave Rolsky's C<Log::Dispatch> appender framework.
 
-=head1 COPYRIGHT AND LICENSE
+=head1 LICENSE
 
-Copyright 2002-2009 by Mike Schilli E<lt>m@perlmeister.comE<gt> 
+Copyright 2002-2013 by Mike Schilli E<lt>m@perlmeister.comE<gt>
 and Kevin Goess E<lt>cpan@goess.orgE<gt>.
 
 This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself. 
+it under the same terms as Perl itself.
 
-=cut
+=head1 AUTHOR
+
+Please contribute patches to the project on Github:
+
+    http://github.com/mschilli/log4perl
+
+Send bug reports or requests for enhancements to the authors via our
+
+MAILING LIST (questions, bug reports, suggestions/patches):
+log4perl-devel@lists.sourceforge.net
+
+Authors (please contact them via the list above, not directly):
+Mike Schilli <m@perlmeister.com>,
+Kevin Goess <cpan@goess.org>
+
+Contributors (in alphabetical order):
+Ateeq Altaf, Cory Bennett, Jens Berthold, Jeremy Bopp, Hutton
+Davidson, Chris R. Donnelly, Matisse Enzer, Hugh Esco, Anthony
+Foiani, James FitzGibbon, Carl Franks, Dennis Gregorovic, Andy
+Grundman, Paul Harrington, Alexander Hartmaier  David Hull,
+Robert Jacobson, Jason Kohles, Jeff Macdonald, Markus Peter,
+Brett Rann, Peter Rabbitson, Erik Selberg, Aaron Straup Cope,
+Lars Thegler, David Viner, Mac Yang.
+

@@ -26,6 +26,8 @@ sub new {
     my $self = {
         max_until_flushed   => undef,
         max_until_discarded => undef,
+        appender_method_on_flush 
+                            => undef,
         appender            => undef,
         accumulate          => 1,
         persistent          => undef,
@@ -166,6 +168,13 @@ sub flush {
         $self->{app}->SUPER::log_cached($_);
     }
 
+      # call flush() on the attached appender if so desired.
+    if( $self->{appender_method_on_flush} ) {
+        no strict 'refs';
+        my $method = $self->{appender_method_on_flush};
+        $self->{app}->$method();
+    }
+
         # Empty buffer
     $self->{buffer} = [];
 }
@@ -180,6 +189,8 @@ sub DESTROY {
 1;
 
 __END__
+
+=encoding utf8
 
 =head1 NAME
 
@@ -207,10 +218,10 @@ __END__
     );
 
     Log::Log4perl->init(\$conf);
-    WARN("This message will be sent immediately");
+    WARN("This message will be sent immediately.");
     WARN("This message will be delayed by one hour.");
     sleep(3601);
-    WARN("This message plus the last one will be sent now");
+    WARN("This message plus the last one will be sent now, seperately.");
 
 =head1 DESCRIPTION
 
@@ -247,6 +258,34 @@ Maximum number of accumulated messages. If exceeded, the appender will
 simply discard additional messages, waiting for C<block_period> to expire
 to flush all accumulated messages. Don't mix with C<max_until_flushed>.
 
+=item C<appender_method_on_flush>
+
+Optional method name to be called on the appender attached to the
+limiter when messages are flushed. For example, to have the sample code 
+in the SYNOPSIS section bundle buffered emails into one, change the 
+mailer's C<buffered> parameter to C<1> and set the limiters 
+C<appender_method_on_flush> value to the string C<"flush">:
+
+      log4perl.category = WARN, Limiter
+    
+          # Email appender
+      log4perl.appender.Mailer          = Log::Dispatch::Email::MailSend
+      log4perl.appender.Mailer.to       = drone\@pageme.com
+      log4perl.appender.Mailer.subject  = Something's broken!
+      log4perl.appender.Mailer.buffered = 1
+      log4perl.appender.Mailer.layout   = PatternLayout
+      log4perl.appender.Mailer.layout.ConversionPattern=%d %m %n
+
+          # Limiting appender, using the email appender above
+      log4perl.appender.Limiter              = Log::Log4perl::Appender::Limit
+      log4perl.appender.Limiter.appender     = Mailer
+      log4perl.appender.Limiter.block_period = 3600
+      log4perl.appender.Limiter.appender_method_on_flush = flush
+
+This will cause the mailer to buffer messages and wait for C<flush()>
+to send out the whole batch. The limiter will then call the appender's
+C<flush()> method when it's own buffer gets flushed out.
+
 =back
 
 If the appender attached to C<Limit> uses C<PatternLayout> with a timestamp
@@ -267,12 +306,35 @@ Custom filters are also applied to the composite appender only.
 They are I<not> applied to the sub-appender. Same applies to appender
 thresholds. This behaviour might change in the future.
 
-=head1 COPYRIGHT AND LICENSE
+=head1 LICENSE
 
-Copyright 2002-2009 by Mike Schilli E<lt>m@perlmeister.comE<gt> 
+Copyright 2002-2013 by Mike Schilli E<lt>m@perlmeister.comE<gt> 
 and Kevin Goess E<lt>cpan@goess.orgE<gt>.
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself. 
 
-=cut
+=head1 AUTHOR
+
+Please contribute patches to the project on Github:
+
+    http://github.com/mschilli/log4perl
+
+Send bug reports or requests for enhancements to the authors via our
+
+MAILING LIST (questions, bug reports, suggestions/patches): 
+log4perl-devel@lists.sourceforge.net
+
+Authors (please contact them via the list above, not directly):
+Mike Schilli <m@perlmeister.com>,
+Kevin Goess <cpan@goess.org>
+
+Contributors (in alphabetical order):
+Ateeq Altaf, Cory Bennett, Jens Berthold, Jeremy Bopp, Hutton
+Davidson, Chris R. Donnelly, Matisse Enzer, Hugh Esco, Anthony
+Foiani, James FitzGibbon, Carl Franks, Dennis Gregorovic, Andy
+Grundman, Paul Harrington, Alexander Hartmaier  David Hull, 
+Robert Jacobson, Jason Kohles, Jeff Macdonald, Markus Peter, 
+Brett Rann, Peter Rabbitson, Erik Selberg, Aaron Straup Cope, 
+Lars Thegler, David Viner, Mac Yang.
+
