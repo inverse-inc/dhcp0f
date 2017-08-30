@@ -9,7 +9,7 @@ dhcp0f.pl - Passive DHCP analyzer with OS fingerprinting on the LAN through DHCP
 dhcp0f.pl [options]
 
  Options:
-   -k      Fingerbank API key (mandatory)
+   -k      Fingerbank API key
    -i      Interface (default: "eth0")
    -f      Filter (eg. "host 128.103.1.1")
    -c      CHADDR (show requests from specific client)
@@ -49,7 +49,6 @@ use Try::Tiny;
 
 use Util qw(clean_mac);
 use pf::util::dhcp;
-use fingerbank::api;
 
 my %args;
 getopts( 'k:t:i:f:c:o:huv', \%args );
@@ -62,9 +61,10 @@ if ( $args{v} ) {
 Log::Log4perl->easy_init({ level  => $verbose, layout => '%m%n' });
 my $logger = Log::Log4perl->get_logger('');                                                                             
 
-unless($args{'k'}){
-    $logger->fatal("No key specified");
-    pod2usage( -verbose => 1 );
+my $fingerbank = 0;
+if ( $args{k} ) {
+    require fingerbank::api;
+    $fingerbank = 1;
 }
 
 my $interface = $args{i} || "eth0";
@@ -204,19 +204,20 @@ sub listen_dhcp {
     $logger->info("DHCP fingerprint: " . ( defined($dhcp_fingerprint) ? $dhcp_fingerprint : 'None' ));
     $logger->info("DHCP vendor: " . ( defined($dhcp_vendor) ? $dhcp_vendor : 'None' ));
 
-    my $fingerbank_result = fingerbank::api::query($args{k}, {dhcp_fingerprint => $dhcp_fingerprint, dhcp_vendor => $dhcp_vendor});
+    if ( $fingerbank ) {
+        my $fingerbank_result = fingerbank::api::query($args{k}, {dhcp_fingerprint => $dhcp_fingerprint, dhcp_vendor => $dhcp_vendor});
 
-    if(defined($fingerbank_result)) {
-        my $fingerbank_device = join('/', reverse(map {$_->{name}} @{$fingerbank_result->{device}->{parents}})) . '/' . $fingerbank_result->{device}->{name};
-        $logger->info("Fingerbank device : $fingerbank_device (".$fingerbank_result->{device}->{id}.")");
-        my $fingerbank_version = $fingerbank_result->{version} // 'Unknown';
-        $logger->info("Fingerbank device version : ".$fingerbank_version);
-        $logger->info("Fingerbank device score : ".$fingerbank_result->{score});
+        if(defined($fingerbank_result)) {
+            my $fingerbank_device = join('/', reverse(map {$_->{name}} @{$fingerbank_result->{device}->{parents}})) . '/' . $fingerbank_result->{device}->{name};
+            $logger->info("Fingerbank device : $fingerbank_device (".$fingerbank_result->{device}->{id}.")");
+            my $fingerbank_version = $fingerbank_result->{version} // 'Unknown';
+            $logger->info("Fingerbank device version : ".$fingerbank_version);
+            $logger->info("Fingerbank device score : ".$fingerbank_result->{score});
+        }
+        else {
+            $logger->info("Fingerbank device unknown");
+        }
     }
-    else {
-        $logger->info("Fingerbank device unknown");
-    }
-
     $logger->info("=" x 80);
 }
 
