@@ -206,9 +206,9 @@ sub listen_dhcp {
         $logger->debug(Dumper($dhcp));
     } elsif ( $output_type eq 'json' ) {
         $dhcp_hash{'src_mac'} = clean_mac($l2->{'src_mac'});
-        $dhcp_hash{'dest_mac'} = clean_mac($l2->{'dest_mac'});
+        $dhcp_hash{'dst_mac'} = clean_mac($l2->{'dest_mac'});
         $dhcp_hash{'src_ip'} = $l3->{'src_ip'};
-        $dhcp_hash{'dest_ip'} = $l3->{'dest_ip'};
+        $dhcp_hash{'dst_ip'} = $l3->{'dest_ip'};
     }
 
     foreach my $key ( keys(%{ $dhcp->{'options'} }) ) {
@@ -279,9 +279,9 @@ sub listen_dhcp {
     } elsif ( $output_type eq 'json' ) {
       $logger->debug("-" x 80);
       $logger->debug("src_mac: " . clean_mac($l2->{'src_mac'}));
-      $logger->debug("dest_mac: " . clean_mac($l2->{'dest_mac'}));
+      $logger->debug("dst_mac: " . clean_mac($l2->{'dest_mac'}));
       $logger->debug("src_ip: " . $l3->{'src_ip'});
-      $logger->debug("dest_ip: " . $l3->{'dest_ip'});
+      $logger->debug("dst_ip: " . $l3->{'dest_ip'});
       $logger->debug("hostname: " . ( defined($dhcp->{'options'}{'12'}) ? $dhcp->{'options'}{'12'} : ''));
       $logger->debug("vlan: " . $vlan);
       $logger->debug("dhcp option 53 (message type): " . ( defined($dhcp->{'options'}{'53'}) ? $dhcp->{'options'}{'53'} : '' ));
