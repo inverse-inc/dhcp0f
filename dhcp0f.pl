@@ -180,7 +180,12 @@ sub listen_dhcp {
     #past all the returns, the real work starts
     my %dhcp_hash; #this could be conditional but doesn't seem worth it
     $dhcp_hash{'msg_type'} = $dhcp->{'options'}{'53'};
-    $dhcp_hash{'hostname'} = ( defined($dhcp->{'options'}{'12'}) ? $dhcp->{'options'}{'12'} : '');
+    if(defined($dhcp->{'options'}{'12'})) {
+        $dhcp_hash{'hostname'} = ( defined($dhcp->{'options'}{'12'}) ? $dhcp->{'options'}{'12'} : '');
+    }
+    if(defined($dhcp->{'options'}{'50'})) {
+        $dhcp_hash{'req_addr'} = ( defined($dhcp->{'options'}{'50'}) ? $dhcp->{'options'}{'50'} : '');
+    }
 
     #https://en.wikipedia.org/wiki/EtherType
     #33024 is 0x8100 802.1q
@@ -243,11 +248,19 @@ sub listen_dhcp {
     my $dhcp_fingerprint = $dhcp->{'options'}{'55'};
     my $dhcp_vendor = $dhcp->{'options'}{'60'};
     if ( $output_type eq 'plain' ) {
-        $logger->info("DHCP fingerprint: " . ( defined($dhcp_fingerprint) ? $dhcp_fingerprint : 'None' ));
-        $logger->info("DHCP vendor: " . ( defined($dhcp_vendor) ? $dhcp_vendor : 'None' ));
+        if(defined($dhcp_fingerprint)) {
+            $logger->info("DHCP fingerprint: " . $dhcp_fingerprint);
+        }
+        if(defined($dhcp_vendor)) {
+            $logger->info("DHCP vendor: " . $dhcp_vendor);
+        }
     } elsif ( $output_type eq 'json' ) {
-        $dhcp_hash{'dhcp_fingerprint'} = ( defined($dhcp_fingerprint) ? $dhcp_fingerprint : 'None' );
-        $dhcp_hash{'dhcp_vendor'} = ( defined($dhcp_vendor) ? $dhcp_vendor : 'None' );
+        if(defined($dhcp_fingerprint)) {
+            $dhcp_hash{'dhcp_fingerprint'} = $dhcp_fingerprint;
+        }
+        if(defined($dhcp_vendor)) {
+            $dhcp_hash{'dhcp_vendor'} = $dhcp_vendor;
+        }
     }
 
     if ( $fingerbank ) {
@@ -284,6 +297,7 @@ sub listen_dhcp {
       $logger->debug("dst_ip: " . $l3->{'dest_ip'});
       $logger->debug("hostname: " . ( defined($dhcp->{'options'}{'12'}) ? $dhcp->{'options'}{'12'} : ''));
       $logger->debug("vlan: " . $vlan);
+      $logger->debug("dhcp option 50 (requested address): " . ( defined($dhcp->{'options'}{'50'}) ? $dhcp->{'options'}{'50'} : '' ));
       $logger->debug("dhcp option 53 (message type): " . ( defined($dhcp->{'options'}{'53'}) ? $dhcp->{'options'}{'53'} : '' ));
       $logger->debug("TTL: $l3->{'ttl'}");
       $logger->debug("dhcp fingerprint: " . ( defined($dhcp_fingerprint) ? $dhcp_fingerprint : 'None' ));
