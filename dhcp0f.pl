@@ -181,6 +181,7 @@ sub listen_dhcp {
     my %dhcp_hash; #this could be conditional but doesn't seem worth it
     $dhcp_hash{'msg_type'} = $dhcp->{'options'}{'53'};
     $dhcp_hash{'hostname'} = ( defined($dhcp->{'options'}{'12'}) ? $dhcp->{'options'}{'12'} : '');
+    $dhcp_hash{'req_addr'} = ( defined($dhcp->{'options'}{'50'}) ? $dhcp->{'options'}{'50'} : '');
 
     #https://en.wikipedia.org/wiki/EtherType
     #33024 is 0x8100 802.1q
@@ -284,6 +285,7 @@ sub listen_dhcp {
       $logger->debug("dst_ip: " . $l3->{'dest_ip'});
       $logger->debug("hostname: " . ( defined($dhcp->{'options'}{'12'}) ? $dhcp->{'options'}{'12'} : ''));
       $logger->debug("vlan: " . $vlan);
+      $logger->debug("dhcp option 50 (requested address): " . ( defined($dhcp->{'options'}{'50'}) ? $dhcp->{'options'}{'50'} : '' ));
       $logger->debug("dhcp option 53 (message type): " . ( defined($dhcp->{'options'}{'53'}) ? $dhcp->{'options'}{'53'} : '' ));
       $logger->debug("TTL: $l3->{'ttl'}");
       $logger->debug("dhcp fingerprint: " . ( defined($dhcp_fingerprint) ? $dhcp_fingerprint : 'None' ));
