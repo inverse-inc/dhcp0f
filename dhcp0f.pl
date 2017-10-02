@@ -164,7 +164,10 @@ sub listen_dhcp {
         ($l2, $l3, $l4, $dhcp) = decompose_dhcp($packet);
         $success = 1;
     } catch {
-        $logger->warn("Unable to parse DHCP packet: $_");
+        # we throw out this error in json mode for now
+        if ( $output_type eq 'plain' ) {
+            $logger->warn("Unable to parse DHCP packet: $_");
+        }
     };
     return if (!$success);
 
