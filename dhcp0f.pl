@@ -189,6 +189,9 @@ sub listen_dhcp {
     if(defined($dhcp->{'options'}{'50'})) {
         $dhcp_hash{'req_addr'} = ( defined($dhcp->{'options'}{'50'}) ? $dhcp->{'options'}{'50'} : '');
     }
+    if(defined($dhcp->{'options'}{'15'})) {
+        $dhcp_hash{'domain_name'} = ( defined($dhcp->{'options'}{'15'}) ? $dhcp->{'options'}{'15'} : '');
+    }
 
     #https://en.wikipedia.org/wiki/EtherType
     #33024 is 0x8100 802.1q
