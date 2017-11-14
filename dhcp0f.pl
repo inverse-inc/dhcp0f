@@ -228,7 +228,7 @@ sub listen_dhcp {
 
         my $output;
         if (ref($dhcp->{'options'}{$key}) eq 'ARRAY') {
-            $output = join( ",", @{ $dhcp->{'options'}{$key} } );
+            $output = join( ",", grep defined, @{ $dhcp->{'options'}{$key} } );
 
         } elsif (ref($dhcp->{'options'}{$key}) eq 'SCALAR') {
             $output = ${$dhcp->{'options'}{$key}};
