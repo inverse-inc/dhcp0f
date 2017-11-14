@@ -222,25 +222,25 @@ sub listen_dhcp {
         $dhcp_hash{'dst_ip'} = $l3->{'dest_ip'};
     }
 
-    foreach my $key ( keys(%{ $dhcp->{'options'} }) ) {
-        my $tmpkey = $key;
-        $tmpkey = $msg_types{$key} if ( defined( $msg_types{$key} ) );
+    if ( $output_type eq 'plain' ) {
+        foreach my $key ( keys(%{ $dhcp->{'options'} }) ) {
+            my $tmpkey = $key;
+            $tmpkey = $msg_types{$key} if ( defined( $msg_types{$key} ) );
 
-        my $output;
-        if (ref($dhcp->{'options'}{$key}) eq 'ARRAY') {
-            $output = join( ",", grep defined, @{ $dhcp->{'options'}{$key} } );
+            my $output;
+            if (ref($dhcp->{'options'}{$key}) eq 'ARRAY') {
+                $output = join( ",", grep defined, @{ $dhcp->{'options'}{$key} } );
 
-        } elsif (ref($dhcp->{'options'}{$key}) eq 'SCALAR') {
-            $output = ${$dhcp->{'options'}{$key}};
+            } elsif (ref($dhcp->{'options'}{$key}) eq 'SCALAR') {
+                $output = ${$dhcp->{'options'}{$key}};
 
-        } elsif (ref($dhcp->{'options'}{$key}) eq 'HASH') {
-            $output = Dumper($dhcp->{'options'}{$key});
+            } elsif (ref($dhcp->{'options'}{$key}) eq 'HASH') {
+                $output = Dumper($dhcp->{'options'}{$key});
 
-        } elsif (!ref($dhcp->{'options'}{$key})) {
-            $output = $dhcp->{'options'}{$key};
-        }
-        unless ( !$output ) {
-            if ( $output_type eq 'plain' ) {
+            } elsif (!ref($dhcp->{'options'}{$key})) {
+                $output = $dhcp->{'options'}{$key};
+            }
+            unless ( !$output ) {
                 $logger->info( "$tmpkey: $output" );
             }
         }
