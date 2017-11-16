@@ -184,17 +184,13 @@ sub listen_dhcp {
     my %dhcp_hash; #this could be conditional but doesn't seem worth it
     $dhcp_hash{'msg_type'} = $dhcp->{'options'}{'53'};
     if(defined($dhcp->{'options'}{'12'})) {
-        if ( $dhcp->{'options'}{'12'}.chomp =~ /^[[\p{L}\.0-9]]+$/ ) {
-            $dhcp_hash{'hostname'} = $dhcp->{'options'}{'12'};
-        }
+        $dhcp_hash{'hostname'} = $dhcp->{'options'}{'12'};
     }
     if(defined($dhcp->{'options'}{'50'})) {
-        $dhcp_hash{'req_addr'} = ( defined($dhcp->{'options'}{'50'}) ? $dhcp->{'options'}{'50'} : '');
+        $dhcp_hash{'req_addr'} = $dhcp->{'options'}{'50'};
     }
     if(defined($dhcp->{'options'}{'15'})) {
-        if ( $dhcp->{'options'}{'15'}.chomp =~ /^[[\p{L}\.0-9]]+$/ ) {
-            $dhcp_hash{'domain_name'} = $dhcp->{'options'}{'15'};
-        }
+        $dhcp_hash{'domain_name'} = $dhcp->{'options'}{'15'};
     }
 
     #https://en.wikipedia.org/wiki/EtherType
